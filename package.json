@@ -1,0 +1,40 @@
+{
+  "name": "@pcl/cli-toolkit",
+  "version": "1.0.0",
+  "description": "Shared CLI infrastructure for Papercut Labs",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "commander": ">=11.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "commander": "^12.0.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/teren-papercutlabs/pcl-shared-packages.git",
+    "directory": "pcl-cli-toolkit"
+  },
+  "author": "Papercut Labs",
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}
