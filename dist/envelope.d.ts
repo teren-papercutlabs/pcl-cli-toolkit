@@ -9,6 +9,8 @@ export type CliError = {
     hint?: string;
     [key: string]: unknown;
 };
+/** Register flag names whose values should be redacted from meta.command */
+export declare function setSensitiveFlags(flags: string[]): void;
 export declare function buildMeta(overrides?: Partial<CliMeta>): CliMeta;
 export declare function writeJson(payload: unknown, pretty?: boolean): void;
 export declare function writeEnvelope<T>(data: T, options?: {
