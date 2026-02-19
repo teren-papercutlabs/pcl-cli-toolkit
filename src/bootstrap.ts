@@ -35,15 +35,15 @@ export function runCli(main: () => Promise<void>): void {
 
   main()
     .then(() => {
-      process.exit(process.exitCode ?? 0);
+      // Let Node exit naturally — process.exitCode is already set by callers
     })
     .catch((error: unknown) => {
       // Handle Commander help/version display gracefully
       const err = error as { code?: string; message?: string };
       if (err?.code === 'commander.helpDisplayed' || err?.code === 'commander.version') {
-        process.exit(0);
+        return; // exitCode defaults to 0
       }
       console.error(JSON.stringify({ ok: false, error: String(err?.message || error) }));
-      process.exit(1);
+      process.exitCode = 1;
     });
 }

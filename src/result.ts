@@ -16,7 +16,7 @@ export function unwrap<T>(result: CliResult<T> | { ok: false; error: string }): 
   if (typeof err === 'string') {
     writeErrorEnvelope({ message: err });
   } else {
-    writeErrorEnvelope({ code: err.code, message: err.message });
+    writeErrorEnvelope(err);
   }
   process.exit(1);
 }

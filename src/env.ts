@@ -10,14 +10,16 @@ export function loadEnv(paths: string[]): void {
   const origLog = console.log;
   console.log = () => {};
 
-  for (const p of paths) {
-    const resolved = p.startsWith('~')
-      ? path.join(process.env.HOME || '', p.slice(1))
-      : path.resolve(p);
-    if (fs.existsSync(resolved)) {
-      dotenv.config({ path: resolved });
+  try {
+    for (const p of paths) {
+      const resolved = p.startsWith('~')
+        ? path.join(process.env.HOME || '', p.slice(1))
+        : path.resolve(p);
+      if (fs.existsSync(resolved)) {
+        dotenv.config({ path: resolved });
+      }
     }
+  } finally {
+    console.log = origLog;
   }
-
-  console.log = origLog;
 }

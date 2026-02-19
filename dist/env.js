@@ -8,14 +8,18 @@ import fs from 'fs';
 export function loadEnv(paths) {
     const origLog = console.log;
     console.log = () => { };
-    for (const p of paths) {
-        const resolved = p.startsWith('~')
-            ? path.join(process.env.HOME || '', p.slice(1))
-            : path.resolve(p);
-        if (fs.existsSync(resolved)) {
-            dotenv.config({ path: resolved });
+    try {
+        for (const p of paths) {
+            const resolved = p.startsWith('~')
+                ? path.join(process.env.HOME || '', p.slice(1))
+                : path.resolve(p);
+            if (fs.existsSync(resolved)) {
+                dotenv.config({ path: resolved });
+            }
         }
     }
-    console.log = origLog;
+    finally {
+        console.log = origLog;
+    }
 }
 //# sourceMappingURL=env.js.map

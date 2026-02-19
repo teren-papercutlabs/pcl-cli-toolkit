@@ -12,7 +12,7 @@ export function unwrap(result) {
         writeErrorEnvelope({ message: err });
     }
     else {
-        writeErrorEnvelope({ code: err.code, message: err.message });
+        writeErrorEnvelope(err);
     }
     process.exit(1);
 }
