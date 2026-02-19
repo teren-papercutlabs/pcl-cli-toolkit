@@ -35,15 +35,18 @@ export function runCli(main: () => Promise<void>): void {
 
   main()
     .then(() => {
-      // Let Node exit naturally — process.exitCode is already set by callers
+      // process.exit() is required — Commander/Ink event listeners keep the
+      // event loop alive, preventing natural exit. Without this, CLI processes
+      // hang indefinitely and exhaust Supabase connection pools.
+      process.exit(process.exitCode ?? 0);
     })
     .catch((error: unknown) => {
       // Handle Commander help/version display gracefully
       const err = error as { code?: string; message?: string };
       if (err?.code === 'commander.helpDisplayed' || err?.code === 'commander.version') {
-        return; // exitCode defaults to 0
+        process.exit(0);
       }
       console.error(JSON.stringify({ ok: false, error: String(err?.message || error) }));
-      process.exitCode = 1;
+      process.exit(1);
     });
 }
