@@ -1,7 +1,6 @@
+import { Help } from 'commander';
 function describeCommand(cmd) {
-    // Access Commander internals for args (not exposed in public types)
-    const rawArgs = cmd._args ?? [];
-    const args = rawArgs.map((arg) => ({
+    const args = cmd.registeredArguments.map((arg) => ({
         name: arg.name(),
         required: arg.required,
         description: arg.description || undefined,
@@ -9,20 +8,18 @@ function describeCommand(cmd) {
     }));
     const options = cmd.options
         .filter((opt) => !opt.hidden)
-        .map((opt) => {
-        const o = opt;
-        return {
-            name: o.long || o.short || '',
-            short: o.short || undefined,
-            required: o.required || false,
-            description: o.description || undefined,
-            defaultValue: o.defaultValue !== undefined ? o.defaultValue : undefined,
-            choices: o.argChoices || undefined,
-        };
-    });
-    const subcommands = cmd.commands
-        .filter((sub) => !sub._hidden)
-        .map(describeCommand);
+        .map((opt) => ({
+        name: opt.long || opt.short || '',
+        short: opt.short || undefined,
+        required: opt.required || false,
+        description: opt.description || undefined,
+        defaultValue: opt.defaultValue !== undefined ? opt.defaultValue : undefined,
+        choices: opt.argChoices || undefined,
+    }));
+    // Use Commander's Help class to get only visible (non-hidden) subcommands.
+    // _hidden is not exposed publicly in Commander 12; visibleCommands() is the official filter.
+    const visibleSubs = new Help().visibleCommands(cmd);
+    const subcommands = visibleSubs.map(describeCommand);
     return {
         name: cmd.name(),
         description: cmd.description() || undefined,
@@ -36,27 +33,24 @@ function describeCommand(cmd) {
  * Walks the Commander tree recursively.
  */
 export function describe(program) {
+    const visibleCmds = new Help().visibleCommands(program);
     return {
         name: program.name(),
         description: program.description() || undefined,
         version: program.version() || undefined,
-        commands: program.commands
-            .filter((cmd) => !cmd._hidden)
-            .map(describeCommand),
+        commands: visibleCmds.map(describeCommand),
     };
 }
 /**
  * Register a --describe flag on the program that outputs the manifest and exits.
+ * Uses program.on('option:describe') so it fires even when no subcommand is given
+ * (preAction is only called when a subcommand action runs).
  */
 export function registerDescribe(program) {
     program.option('--describe', 'Output machine-readable command manifest as JSON');
-    program.hook('preAction', (thisCommand) => {
-        const opts = thisCommand.optsWithGlobals();
-        if (opts.describe) {
-            const manifest = describe(program);
-            process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');
-            process.exit(0);
-        }
+    program.on('option:describe', () => {
+        process.stdout.write(JSON.stringify(describe(program), null, 2) + '\n');
+        process.exit(0);
     });
 }
 //# sourceMappingURL=describe.js.map
