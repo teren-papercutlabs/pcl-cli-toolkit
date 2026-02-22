@@ -6,5 +6,5 @@ export { unwrap } from './result.js';
 export type { CliResult, CliSuccess, CliFailure } from './result.js';
 export { describe, registerDescribe } from './describe.js';
 export type { CliManifest } from './describe.js';
-export { parseDate, parseNumber, parseEnum } from './validate.js';
+export { parseDate, parseNumber, parseEnum, requireHumanApproval } from './validate.js';
 export { readInput } from './input.js';

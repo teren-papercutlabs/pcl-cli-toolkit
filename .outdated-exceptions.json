@@ -1,0 +1,17 @@
+{
+  "@types/node": {
+    "reason": "Deferring major version upgrades during package rename task; not blocking current functionality",
+    "expires": "2026-03-22",
+    "ticket": "PAP-TODO"
+  },
+  "commander": {
+    "reason": "Deferring major version upgrades during package rename task; not blocking current functionality",
+    "expires": "2026-03-22",
+    "ticket": "PAP-TODO"
+  },
+  "dotenv": {
+    "reason": "Deferring major version upgrades during package rename task; not blocking current functionality",
+    "expires": "2026-03-22",
+    "ticket": "PAP-TODO"
+  }
+}

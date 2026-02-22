@@ -1,5 +1,5 @@
 {
-  "name": "@pcl/cli-toolkit",
+  "name": "@teren-papercutlabs/cli-toolkit",
   "version": "1.0.0",
   "description": "Shared CLI infrastructure for Papercut Labs",
   "type": "module",

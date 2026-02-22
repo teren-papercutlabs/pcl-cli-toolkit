@@ -1,4 +1,12 @@
 /**
+ * Guard for commands that require explicit human approval.
+ * Agent must pass --human-approved to confirm a human sanctioned this action.
+ * Writes error envelope and exits if flag is missing.
+ */
+export declare function requireHumanApproval(opts: {
+    humanApproved?: boolean;
+}, commandName?: string): void;
+/**
  * Parse a string as a date. Writes error envelope and exits on invalid input.
  */
 export declare function parseDate(value: string, label?: string): Date;

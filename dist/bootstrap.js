@@ -32,10 +32,14 @@ export function runCli(main) {
         process.exit(process.exitCode ?? 0);
     })
         .catch((error) => {
-        // Handle Commander help/version display gracefully
         const err = error;
+        // Handle Commander help/version display gracefully
         if (err?.code === 'commander.helpDisplayed' || err?.code === 'commander.version') {
             process.exit(0);
+        }
+        // Skip re-output if error envelope was already written (e.g., requireHumanApproval)
+        if (process.exitCode && Number(process.exitCode) > 0) {
+            process.exit(process.exitCode);
         }
         console.error(JSON.stringify({ ok: false, error: String(err?.message || error) }));
         process.exit(1);

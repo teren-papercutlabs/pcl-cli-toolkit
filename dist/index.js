@@ -6,7 +6,7 @@ export { unwrap } from './result.js';
 // Introspection
 export { describe, registerDescribe } from './describe.js';
 // Validation
-export { parseDate, parseNumber, parseEnum } from './validate.js';
+export { parseDate, parseNumber, parseEnum, requireHumanApproval } from './validate.js';
 // Input
 export { readInput } from './input.js';
 //# sourceMappingURL=index.js.map
