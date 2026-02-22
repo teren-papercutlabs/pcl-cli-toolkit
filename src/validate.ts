@@ -1,6 +1,23 @@
 import { writeErrorEnvelope } from './envelope.js';
 
 /**
+ * Guard for commands that require explicit human approval.
+ * Agent must pass --human-approved to confirm a human sanctioned this action.
+ * Writes error envelope and exits if flag is missing.
+ */
+export function requireHumanApproval(opts: { humanApproved?: boolean }, commandName?: string): void {
+  if (opts.humanApproved) return;
+  const msg = `${commandName ?? 'This command'} requires --human-approved flag.`;
+  writeErrorEnvelope({
+    code: 'HUMAN_APPROVAL_REQUIRED',
+    message: msg,
+    hint: 'Get explicit human confirmation before running this command.',
+  });
+  // Throw instead of process.exit — Commander's exitOverride causes double output on exit.
+  throw Object.assign(new Error(msg), { code: 'HUMAN_APPROVAL_REQUIRED' });
+}
+
+/**
  * Parse a string as a date. Writes error envelope and exits on invalid input.
  */
 export function parseDate(value: string, label?: string): Date {
