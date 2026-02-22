@@ -29,20 +29,29 @@ export function runCli(main) {
         // process.exit() is required — Commander/Ink event listeners keep the
         // event loop alive, preventing natural exit. Without this, CLI processes
         // hang indefinitely and exhaust Supabase connection pools.
-        process.exit(process.exitCode ?? 0);
+        //
+        // Wait for stdout to drain before exiting. When stdout is a pipe (not a
+        // TTY), process.stdout.write() is async. Calling process.exit()
+        // immediately truncates buffered output at exactly 64KB or 128KB
+        // (OS pipe buffer boundaries). Writing an empty string with a callback
+        // ensures all pending writes flush before the process terminates.
+        const code = process.exitCode ?? 0;
+        process.stdout.write('', () => process.exit(code));
     })
         .catch((error) => {
         const err = error;
         // Handle Commander help/version display gracefully
         if (err?.code === 'commander.helpDisplayed' || err?.code === 'commander.version') {
-            process.exit(0);
+            process.stdout.write('', () => process.exit(0));
+            return;
         }
         // Skip re-output if error envelope was already written (e.g., requireHumanApproval)
         if (process.exitCode && Number(process.exitCode) > 0) {
-            process.exit(process.exitCode);
+            process.stdout.write('', () => process.exit(process.exitCode));
+            return;
         }
         console.error(JSON.stringify({ ok: false, error: String(err?.message || error) }));
-        process.exit(1);
+        process.stdout.write('', () => process.exit(1));
     });
 }
 //# sourceMappingURL=bootstrap.js.map

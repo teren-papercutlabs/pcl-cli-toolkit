@@ -1,6 +1,6 @@
 {
   "name": "@teren-papercutlabs/cli-toolkit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared CLI infrastructure for Papercut Labs",
   "type": "module",
   "main": "dist/index.js",
@@ -11,7 +11,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"
