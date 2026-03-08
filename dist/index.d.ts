@@ -1,4 +1,4 @@
-export { bootstrap, runCli } from './bootstrap.js';
+export { bootstrap, runCli, addAgentAliases } from './bootstrap.js';
 export { loadEnv } from './env.js';
 export { writeEnvelope, writeErrorEnvelope, writeJson, buildMeta, setSensitiveFlags } from './envelope.js';
 export type { CliMeta, CliError } from './envelope.js';

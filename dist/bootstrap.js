@@ -1,5 +1,38 @@
+import { Option } from 'commander';
+import { writeErrorEnvelope } from './envelope.js';
+/** Collect non-hidden long/short flags from the most specific matching command. */
+function collectValidFlags(program) {
+    const activeCmd = findActiveCommand(program);
+    return activeCmd.options
+        .filter((opt) => !opt.hidden)
+        .map((opt) => opt.long ?? opt.short ?? '')
+        .filter(Boolean);
+}
 /**
- * Sets up Commander with exitOverride(), name, description.
+ * Walk the command tree to find the subcommand matching process.argv,
+ * falling back to the program root when no subcommand is found.
+ */
+function findActiveCommand(program) {
+    const args = process.argv.slice(2);
+    for (const cmd of program.commands) {
+        if (args.includes(cmd.name())) {
+            return cmd;
+        }
+    }
+    return program;
+}
+/** Known-wrong flags that agents commonly try. */
+function findHint(flag) {
+    const hints = {
+        '--json': 'Output is already JSON by default. Remove this flag.',
+        '--format': 'Output is always JSON. No format flag needed.',
+        '--verbose': 'Use --debug for verbose output if available.',
+    };
+    return hints[flag];
+}
+/**
+ * Sets up Commander with exitOverride(), name, description, and a structured
+ * error handler that emits JSON envelopes for unknown option/command errors.
  * Returns the program for chaining.
  */
 export function bootstrap(program, opts) {
@@ -9,7 +42,56 @@ export function bootstrap(program, opts) {
     if (opts.version)
         program.version(opts.version);
     program.exitOverride();
+    // Intercept Commander errors and emit structured JSON to stdout.
+    // Commander writes error text to stderr via outputError(); we replace that
+    // path for recognised error patterns so agents get machine-readable output.
+    program.configureOutput({
+        outputError: (str, write) => {
+            // Unknown option: error: unknown option '--json'
+            const unknownOptionMatch = str.match(/error: unknown option '([^']+)'/);
+            if (unknownOptionMatch) {
+                const badFlag = unknownOptionMatch[1];
+                writeErrorEnvelope({
+                    code: 'UNKNOWN_OPTION',
+                    message: `Unknown option: ${badFlag}`,
+                    flag: badFlag,
+                    hint: findHint(badFlag),
+                    validFlags: collectValidFlags(program),
+                });
+                return;
+            }
+            // Unknown command: error: unknown command 'start-run'
+            const unknownCommandMatch = str.match(/error: unknown command '([^']+)'/);
+            if (unknownCommandMatch) {
+                const badCommand = unknownCommandMatch[1];
+                writeErrorEnvelope({
+                    code: 'UNKNOWN_COMMAND',
+                    message: `Unknown command: ${badCommand}`,
+                    command: badCommand,
+                    validCommands: program.commands.map((c) => c.name()),
+                });
+                return;
+            }
+            // All other Commander errors: pass through to stderr unchanged.
+            write(str);
+        },
+    });
     return program;
+}
+/**
+ * Registers hidden flag aliases that AI agents commonly pass to PcL CLIs.
+ * These are no-ops — all PcL CLIs output JSON by default, so --json and
+ * --format are accepted silently for compatibility.
+ *
+ * Call this after bootstrap() on the root program to silence
+ * "unknown option '--json'" errors in agent-generated commands.
+ */
+export function addAgentAliases(program) {
+    // --json is a no-op: all PcL CLIs output JSON by default.
+    // Accepted silently so agent-generated commands don't error.
+    program.addOption(new Option('--json', 'Output JSON (already default — accepted for compatibility)').hideHelp());
+    // --format is a no-op: JSON is the only output format.
+    program.addOption(new Option('--format <format>', 'Output format (JSON is default — accepted for compatibility)').hideHelp());
 }
 /**
  * Wraps parseAsync() with unhandled rejection catching,
