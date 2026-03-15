@@ -68,6 +68,19 @@ export function writeEnvelope<T>(
   writeJson({ ok: true, data, meta: buildMeta(options?.meta) }, options?.pretty);
 }
 
+function exitCodeForError(code: string): number {
+  // Not found — resource doesn't exist
+  if (code.endsWith('_NOT_FOUND') || code.startsWith('MISSING_')) return 2;
+  // Already exists — idempotent create, treat as soft error
+  if (code.endsWith('_EXISTS') || code.startsWith('ALREADY_')) return 3;
+  // Invalid input — validation error, bad flags, wrong format
+  if (code.startsWith('INVALID_') || code === 'PREFIX_TOO_SHORT' || code === 'UNKNOWN_OPTION') return 4;
+  // Operation failed — runtime error, query failure, spawn error
+  if (code.endsWith('_FAILED') || code === 'TIMEOUT' || code === 'DB_ERROR' || code === 'SPAWN_ERROR') return 5;
+  // Default — generic error
+  return 1;
+}
+
 export function writeErrorEnvelope(
   error: { message: string; code?: string; hint?: string; [key: string]: unknown },
   options?: { pretty?: boolean; meta?: Partial<CliMeta> },
@@ -82,6 +95,6 @@ export function writeErrorEnvelope(
     options?.pretty,
   );
   if (!process.exitCode || process.exitCode === 0) {
-    process.exitCode = 1;
+    process.exitCode = exitCodeForError(code ?? 'ERROR');
   }
 }
