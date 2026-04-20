@@ -44,6 +44,22 @@ export function writeJson(payload, pretty) {
 export function writeEnvelope(data, options) {
     writeJson({ ok: true, data, meta: buildMeta(options?.meta) }, options?.pretty);
 }
+function exitCodeForError(code) {
+    // Not found — resource doesn't exist
+    if (code.endsWith('_NOT_FOUND') || code.startsWith('MISSING_'))
+        return 2;
+    // Already exists — idempotent create, treat as soft error
+    if (code.endsWith('_EXISTS') || code.startsWith('ALREADY_'))
+        return 3;
+    // Invalid input — validation error, bad flags, wrong format
+    if (code.startsWith('INVALID_') || code === 'PREFIX_TOO_SHORT' || code === 'UNKNOWN_OPTION')
+        return 4;
+    // Operation failed — runtime error, query failure, spawn error
+    if (code.endsWith('_FAILED') || code === 'TIMEOUT' || code === 'DB_ERROR' || code === 'SPAWN_ERROR')
+        return 5;
+    // Default — generic error
+    return 1;
+}
 export function writeErrorEnvelope(error, options) {
     const { code, message, hint, ...extra } = error;
     writeJson({
@@ -52,7 +68,30 @@ export function writeErrorEnvelope(error, options) {
         meta: buildMeta(options?.meta),
     }, options?.pretty);
     if (!process.exitCode || process.exitCode === 0) {
-        process.exitCode = 1;
+        process.exitCode = exitCodeForError(code ?? 'ERROR');
+    }
+}
+/**
+ * Write the result of a `pcl * create` / `register` command.
+ *
+ * Default output is ID-only (one ID per line, `\n`-terminated). Pass
+ * `{ verbose: true }` to emit the full envelope instead. Callers are expected
+ * to merge `--verbose` and `--json` flag values into the `verbose` option —
+ * see `addVerboseFlag()`.
+ *
+ * Rationale: create commands return a single new-entity identifier that the
+ * caller almost always wants to assign directly — `ID=$(pcl foo create ...)`.
+ * Envelope output required `jq -r '.data.id'` which was the source of
+ * repeated parse-fragility bugs in agent-generated callsites.
+ */
+export function writeCreateResult(id, fullData, options) {
+    if (options?.verbose) {
+        writeEnvelope(fullData, { pretty: options.pretty, meta: options.meta });
+        return;
+    }
+    const ids = Array.isArray(id) ? id : [id];
+    for (const entry of ids) {
+        process.stdout.write(`${entry}\n`);
     }
 }
 //# sourceMappingURL=envelope.js.map
