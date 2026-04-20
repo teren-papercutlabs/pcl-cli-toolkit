@@ -2,7 +2,7 @@
 export { bootstrap, runCli, addAgentAliases } from './bootstrap.js';
 export { loadEnv } from './env.js';
 export { writeEnvelope, writeErrorEnvelope, writeJson, writeCreateResult, buildMeta, setSensitiveFlags } from './envelope.js';
-export { addVerboseFlag } from './verbose-flag.js';
+export { addVerboseFlag, isVerbose } from './verbose-flag.js';
 export { unwrap } from './result.js';
 // Introspection
 export { describe, registerDescribe } from './describe.js';
