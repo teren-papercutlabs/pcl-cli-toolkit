@@ -103,13 +103,19 @@ async function finalizeWritable(stream) {
     await finalized;
 }
 let forcedExit;
+let forcedExitCode = 0;
+function normalizeExitCode(code) {
+    const numeric = Number(code ?? 0);
+    return Number.isInteger(numeric) ? numeric : 1;
+}
 function exitAfterStreamFinalization(code) {
+    forcedExitCode = Math.max(forcedExitCode, code);
     forcedExit ??= (async () => {
         await Promise.allSettled([
             finalizeWritable(process.stdout),
             finalizeWritable(process.stderr),
         ]);
-        process.exit(code);
+        process.exit(forcedExitCode);
     })();
 }
 /**
@@ -122,7 +128,9 @@ export function runCli(main) {
         process.exitCode = 1;
     });
     process.on('uncaughtException', (error) => {
-        console.error('Uncaught exception:', error);
+        if (!process.stderr.destroyed && !process.stderr.writableEnded) {
+            console.error('Uncaught exception:', error);
+        }
         exitAfterStreamFinalization(1);
     });
     main()
@@ -131,7 +139,10 @@ export function runCli(main) {
         // event loop alive, preventing natural exit. Without this, CLI processes
         // hang indefinitely and exhaust Supabase connection pools.
         //
-        const code = Number(process.exitCode ?? 0);
+        // `end()` + `finished()` is the ordering barrier: it completes only
+        // after each stream has finalized its already-buffered writes. A
+        // follow-up empty write callback is not a barrier for prior data.
+        const code = normalizeExitCode(process.exitCode);
         exitAfterStreamFinalization(code);
     })
         .catch((error) => {
@@ -143,7 +154,7 @@ export function runCli(main) {
         }
         // Skip re-output if error envelope was already written (e.g., requireHumanApproval)
         if (process.exitCode && Number(process.exitCode) > 0) {
-            exitAfterStreamFinalization(Number(process.exitCode));
+            exitAfterStreamFinalization(normalizeExitCode(process.exitCode));
             return;
         }
         console.error(JSON.stringify({ ok: false, error: String(err?.message || error) }));

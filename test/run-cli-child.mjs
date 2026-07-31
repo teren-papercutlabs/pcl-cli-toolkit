@@ -25,4 +25,11 @@ runCli(async () => {
   if (mode === 'rejected-main') {
     throw new Error('rejected-main');
   }
+
+  if (mode === 'uncaught-during-main') {
+    setImmediate(() => {
+      throw 'uncaught-during-main';
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
 });

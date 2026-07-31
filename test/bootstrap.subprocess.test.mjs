@@ -63,3 +63,10 @@ test('flushes both streams when the main promise rejects', () => {
     error: 'rejected-main',
   });
 });
+
+test('escalates a concurrent uncaught exception without writing after stream end', () => {
+  const result = run('uncaught-during-main');
+  assertExactJson(result, successEnvelope, 1);
+  const expectedError = `${diagnostic}Uncaught exception: uncaught-during-main\n`;
+  assert.equal(result.stderr, expectedError);
+});
