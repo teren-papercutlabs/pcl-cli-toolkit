@@ -16,7 +16,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "pnpm build && node --test test/*.test.mjs"
   },
   "peerDependencies": {
     "commander": ">=11.0.0"
