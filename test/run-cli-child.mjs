@@ -32,4 +32,9 @@ runCli(async () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
+
+  if (mode === 'unhandled-during-main') {
+    Promise.reject('unhandled-during-main');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
 });

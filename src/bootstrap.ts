@@ -142,8 +142,11 @@ function exitAfterStreamFinalization(code: number): void {
  */
 export function runCli(main: () => Promise<void>): void {
   process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled rejection:', reason);
+    if (!process.stderr.destroyed && !process.stderr.writableEnded) {
+      console.error('Unhandled rejection:', reason);
+    }
     process.exitCode = 1;
+    if (forcedExit) exitAfterStreamFinalization(1);
   });
 
   process.on('uncaughtException', (error) => {

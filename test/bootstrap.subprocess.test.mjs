@@ -70,3 +70,10 @@ test('escalates a concurrent uncaught exception without writing after stream end
   const expectedError = `${diagnostic}Uncaught exception: uncaught-during-main\n`;
   assert.equal(result.stderr, expectedError);
 });
+
+test('escalates a concurrent unhandled rejection without writing after stream end', () => {
+  const result = run('unhandled-during-main');
+  assertExactJson(result, successEnvelope, 1);
+  const expectedError = `${diagnostic}Unhandled rejection: unhandled-during-main\n`;
+  assert.equal(result.stderr, expectedError);
+});
