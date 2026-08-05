@@ -4,7 +4,7 @@ Use `createPrepareSubmitContract` when a CLI noun has a draft-producing `prepare
 
 The definition supplies derivation and exactly one validator. The contract closes both paths over that validator, aggregates requirements through `createRequirementValidator`, and emits a serializable checksum for the contract version, draft, and validation result. The checksum catches accidental changes and stale wrappers; it is public data, not authentication or a tamper-proof token. Submit always reruns the closed-over validator and only invokes the mutation callback when that current result is green.
 
-Prepared output also carries the same checksum under deprecated `proof` for wire compatibility. Submit accepts checksum-only and legacy proof-only artifacts. Missing or malformed metadata returns a structured `PREPARE_SUBMIT_DIVERGENCE`; it never bypasses validation or reaches persistence.
+Prepared output also carries the same checksum under deprecated `proof` for wire compatibility. `PreparedDraft.checksum` remains required for current TypeScript callers; only `contract.submit` widens its input to `SubmittablePreparedDraft`, which also accepts the exported legacy proof-only shape. Missing or malformed metadata returns a structured `PREPARE_SUBMIT_DIVERGENCE`; it never bypasses validation or reaches persistence.
 
 ```ts
 const create = createPrepareSubmitContract({

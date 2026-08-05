@@ -30,10 +30,28 @@ export type PreparedDraft<Draft> = {
   draft: Draft;
   validation: RequirementEvaluation;
   readyToSubmit: boolean;
-  checksum?: PrepareChecksum;
+  checksum: PrepareChecksum;
   /** @deprecated Use checksum. Submit continues to accept legacy prepared artifacts. */
   proof?: PrepareProof;
 };
+
+/** Legacy proof-only wire shape accepted by submit, but never emitted by prepare. */
+export type LegacyPreparedDraft<Draft> = {
+  draft: Draft;
+  validation: RequirementEvaluation;
+  readyToSubmit: boolean;
+  proof: PrepareProof;
+  checksum?: never;
+};
+
+export type SubmittablePreparedDraft<Draft> = PreparedDraft<Draft> | LegacyPreparedDraft<Draft>;
+
+type Assert<T extends true> = T;
+type IsRequired<T, Key extends keyof T> = {} extends Pick<T, Key> ? false : true;
+/** Compile-time regression guard: current callers may rely on checksum being required. */
+type PreparedDraftChecksumMustRemainRequired = Assert<
+  IsRequired<PreparedDraft<JsonObject>, 'checksum'>
+>;
 
 export type PrepareSubmitRefusal = RequirementRefusal & {
   prepareCommand: string;
@@ -63,7 +81,7 @@ export type PrepareSubmitContract<Input, Draft extends JsonObject, Context> = Re
   prepare: (input: Readonly<Input>, context: Readonly<Context>) => PreparedDraft<Draft>;
   prepareDraft: (draft: Draft, context: Readonly<Context>) => PreparedDraft<Draft>;
   submit: <Output>(
-    prepared: PreparedDraft<Draft>,
+    prepared: SubmittablePreparedDraft<Draft>,
     context: Readonly<Context>,
     commit: (draft: Readonly<Draft>) => Output | Promise<Output>,
   ) => Promise<SubmitResult<Output>>;
@@ -194,7 +212,7 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
   return Object.freeze(contract);
 }
 
-function readPreparedChecksum<Draft>(prepared: PreparedDraft<Draft>): PrepareChecksum | null {
+function readPreparedChecksum<Draft>(prepared: SubmittablePreparedDraft<Draft>): PrepareChecksum | null {
   if (isPrepareChecksum(prepared.checksum)) return prepared.checksum;
   if (isPrepareChecksum(prepared.proof)) return prepared.proof;
   return null;

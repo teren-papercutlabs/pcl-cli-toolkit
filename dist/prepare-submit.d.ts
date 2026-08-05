@@ -18,10 +18,19 @@ export type PreparedDraft<Draft> = {
     draft: Draft;
     validation: RequirementEvaluation;
     readyToSubmit: boolean;
-    checksum?: PrepareChecksum;
+    checksum: PrepareChecksum;
     /** @deprecated Use checksum. Submit continues to accept legacy prepared artifacts. */
     proof?: PrepareProof;
 };
+/** Legacy proof-only wire shape accepted by submit, but never emitted by prepare. */
+export type LegacyPreparedDraft<Draft> = {
+    draft: Draft;
+    validation: RequirementEvaluation;
+    readyToSubmit: boolean;
+    proof: PrepareProof;
+    checksum?: never;
+};
+export type SubmittablePreparedDraft<Draft> = PreparedDraft<Draft> | LegacyPreparedDraft<Draft>;
 export type PrepareSubmitRefusal = RequirementRefusal & {
     prepareCommand: string;
 };
@@ -50,7 +59,7 @@ export type PrepareSubmitContract<Input, Draft extends JsonObject, Context> = Re
     validator: PrepareSubmitValidator<Draft, Context>;
     prepare: (input: Readonly<Input>, context: Readonly<Context>) => PreparedDraft<Draft>;
     prepareDraft: (draft: Draft, context: Readonly<Context>) => PreparedDraft<Draft>;
-    submit: <Output>(prepared: PreparedDraft<Draft>, context: Readonly<Context>, commit: (draft: Readonly<Draft>) => Output | Promise<Output>) => Promise<SubmitResult<Output>>;
+    submit: <Output>(prepared: SubmittablePreparedDraft<Draft>, context: Readonly<Context>, commit: (draft: Readonly<Draft>) => Output | Promise<Output>) => Promise<SubmitResult<Output>>;
 }>;
 /** A visible placeholder for values that require real judgment rather than derivation. */
 export declare function judgmentTodo(field: string, instruction?: string): string;

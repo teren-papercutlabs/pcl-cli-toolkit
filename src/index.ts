@@ -33,6 +33,7 @@ export type {
   JsonObject,
   JsonPrimitive,
   JsonValue,
+  LegacyPreparedDraft,
   PreparedDraft,
   PrepareChecksum,
   PrepareProof,
@@ -40,5 +41,6 @@ export type {
   PrepareSubmitDefinition,
   PrepareSubmitRefusal,
   PrepareSubmitValidator,
+  SubmittablePreparedDraft,
   SubmitResult,
 } from './prepare-submit.js';
