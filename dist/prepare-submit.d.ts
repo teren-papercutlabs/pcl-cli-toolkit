@@ -1,0 +1,62 @@
+import { type Requirement, type RequirementEvaluation, type RequirementRefusal } from './requirements.js';
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export type JsonObject = {
+    readonly [key: string]: JsonValue;
+};
+export type PrepareSubmitValidator<Draft, Context> = (draft: Readonly<Draft>, context: Readonly<Context>) => RequirementEvaluation;
+export type PrepareProof = {
+    contractId: string;
+    contractVersion: number;
+    draftDigest: string;
+    validationDigest: string;
+};
+export type PreparedDraft<Draft> = {
+    draft: Draft;
+    validation: RequirementEvaluation;
+    readyToSubmit: boolean;
+    proof: PrepareProof;
+};
+export type PrepareSubmitRefusal = RequirementRefusal & {
+    prepareCommand: string;
+};
+export type SubmitResult<Output> = {
+    ok: true;
+    output: Output;
+} | {
+    ok: false;
+    refusal: PrepareSubmitRefusal;
+};
+export type PrepareSubmitDefinition<Input, Draft extends JsonObject, Context> = {
+    id: string;
+    version: number;
+    subject: string;
+    prepareCommand: string;
+    derive: (input: Readonly<Input>, context: Readonly<Context>) => Draft;
+    validator: PrepareSubmitValidator<Draft, Context>;
+};
+export type PrepareSubmitContract<Input, Draft extends JsonObject, Context> = Readonly<{
+    id: string;
+    version: number;
+    subject: string;
+    prepareCommand: string;
+    derive: PrepareSubmitDefinition<Input, Draft, Context>['derive'];
+    /** The single validator used by both prepare and submit. Exposed for identity checks. */
+    validator: PrepareSubmitValidator<Draft, Context>;
+    prepare: (input: Readonly<Input>, context: Readonly<Context>) => PreparedDraft<Draft>;
+    prepareDraft: (draft: Draft, context: Readonly<Context>) => PreparedDraft<Draft>;
+    submit: <Output>(prepared: PreparedDraft<Draft>, context: Readonly<Context>, commit: (draft: Readonly<Draft>) => Output | Promise<Output>) => Promise<SubmitResult<Output>>;
+}>;
+/** A visible placeholder for values that require real judgment rather than derivation. */
+export declare function judgmentTodo(field: string, instruction?: string): string;
+/** Build a validator on the existing all-requirements substrate. */
+export declare function createRequirementValidator<Draft, Context>(requirements: (draft: Readonly<Draft>, context: Readonly<Context>) => readonly Requirement[]): PrepareSubmitValidator<Draft, Context>;
+/**
+ * Create the refusal-proof prepare/submit pair.
+ *
+ * The definition accepts exactly one validator. Both paths close over that exact
+ * function, and the returned contract is frozen. Submit also verifies the
+ * serializable prepare proof before committing, so draft or validation drift
+ * fails closed instead of reaching the mutation.
+ */
+export declare function createPrepareSubmitContract<Input, Draft extends JsonObject, Context>(definition: PrepareSubmitDefinition<Input, Draft, Context>): PrepareSubmitContract<Input, Draft, Context>;
