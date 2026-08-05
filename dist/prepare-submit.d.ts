@@ -42,6 +42,7 @@ export type SubmitResult<Output> = {
     refusal: PrepareSubmitRefusal;
 };
 export type PrepareSubmitDefinition<Input, Draft extends JsonObject, Context> = {
+    [key: string]: unknown;
     id: string;
     version: number;
     subject: string;

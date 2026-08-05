@@ -62,6 +62,7 @@ export type SubmitResult<Output> =
   | { ok: false; refusal: PrepareSubmitRefusal };
 
 export type PrepareSubmitDefinition<Input, Draft extends JsonObject, Context> = {
+  [key: string]: unknown;
   id: string;
   version: number;
   subject: string;
@@ -111,12 +112,16 @@ export function createRequirementValidator<Draft, Context>(
 export function createPrepareSubmitContract<Input, Draft extends JsonObject, Context>(
   definition: PrepareSubmitDefinition<Input, Draft, Context>,
 ): PrepareSubmitContract<Input, Draft, Context> {
-  const id = definition.id;
-  const version = definition.version;
-  const subject = definition.subject;
-  const prepareCommand = definition.prepareCommand;
-  const derive = definition.derive;
-  const validator = definition.validator;
+  const definitionSnapshot = Object.freeze({ ...definition });
+  const id = definitionSnapshot.id;
+  const version = definitionSnapshot.version;
+  const subject = definitionSnapshot.subject;
+  const prepareCommand = definitionSnapshot.prepareCommand;
+  const deriveFunction = definitionSnapshot.derive;
+  const derive: PrepareSubmitDefinition<Input, Draft, Context>['derive'] = (input, context) => (
+    deriveFunction.call(definitionSnapshot, input, context)
+  );
+  const validator = definitionSnapshot.validator;
 
   if (!id.trim()) throw new Error('prepare/submit contract id is required');
   if (!Number.isInteger(version) || version < 1) {

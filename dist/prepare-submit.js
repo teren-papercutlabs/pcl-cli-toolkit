@@ -18,12 +18,14 @@ export function createRequirementValidator(requirements) {
  * authority is always a fresh run of the closed-over validator.
  */
 export function createPrepareSubmitContract(definition) {
-    const id = definition.id;
-    const version = definition.version;
-    const subject = definition.subject;
-    const prepareCommand = definition.prepareCommand;
-    const derive = definition.derive;
-    const validator = definition.validator;
+    const definitionSnapshot = Object.freeze({ ...definition });
+    const id = definitionSnapshot.id;
+    const version = definitionSnapshot.version;
+    const subject = definitionSnapshot.subject;
+    const prepareCommand = definitionSnapshot.prepareCommand;
+    const deriveFunction = definitionSnapshot.derive;
+    const derive = (input, context) => (deriveFunction.call(definitionSnapshot, input, context));
+    const validator = definitionSnapshot.validator;
     if (!id.trim())
         throw new Error('prepare/submit contract id is required');
     if (!Number.isInteger(version) || version < 1) {

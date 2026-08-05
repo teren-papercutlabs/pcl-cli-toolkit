@@ -261,6 +261,30 @@ test('contract behavior snapshots every definition field and function at creatio
   assert.deepEqual(submitted, { ok: true, output: 'original' });
 });
 
+test('method-style derive keeps this bound to the frozen shallow definition snapshot', async () => {
+  const definition = {
+    id: 'method.create',
+    version: 1,
+    subject: 'Method create',
+    prepareCommand: 'pcl method prepare',
+    prefix: 'original',
+    derive(input) {
+      return { value: `${this.prefix}:${input.value}` };
+    },
+    validator: () => ({ ok: true, unmetRequirements: [] }),
+  };
+  const contract = createPrepareSubmitContract(definition);
+  definition.prefix = 'mutated';
+  definition.derive = () => ({ value: 'replacement' });
+
+  const prepared = contract.prepare({ value: 'payload' }, {});
+  assert.equal(prepared.draft.value, 'original:payload');
+  assert.equal(contract.derive({ value: 'direct' }, {}).value, 'original:direct');
+
+  const submitted = await contract.submit(prepared, {}, (draft) => draft.value);
+  assert.deepEqual(submitted, { ok: true, output: 'original:payload' });
+});
+
 test('undefined validation metadata follows JSON transport semantics', async () => {
   const contract = createPrepareSubmitContract({
     id: 'metadata.create',
