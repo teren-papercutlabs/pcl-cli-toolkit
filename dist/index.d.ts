@@ -12,4 +12,4 @@ export { evaluateRequirements, buildRequirementRefusal } from './requirements.js
 export type { Requirement, RequirementEvaluation, RequirementRefusal, RequirementResult, UnmetRequirement, } from './requirements.js';
 export { readInput } from './input.js';
 export { createPrepareSubmitContract, createRequirementValidator, judgmentTodo } from './prepare-submit.js';
-export type { JsonObject, JsonPrimitive, JsonValue, PreparedDraft, PrepareChecksum, PrepareSubmitContract, PrepareSubmitDefinition, PrepareSubmitRefusal, PrepareSubmitValidator, SubmitResult, } from './prepare-submit.js';
+export type { JsonObject, JsonPrimitive, JsonValue, PreparedDraft, PrepareChecksum, PrepareProof, PrepareSubmitContract, PrepareSubmitDefinition, PrepareSubmitRefusal, PrepareSubmitValidator, SubmitResult, } from './prepare-submit.js';

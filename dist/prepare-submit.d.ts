@@ -12,11 +12,15 @@ export type PrepareChecksum = {
     draftDigest: string;
     validationDigest: string;
 };
+/** @deprecated Use PrepareChecksum. Retained for prepared-artifact wire compatibility. */
+export type PrepareProof = PrepareChecksum;
 export type PreparedDraft<Draft> = {
     draft: Draft;
     validation: RequirementEvaluation;
     readyToSubmit: boolean;
-    checksum: PrepareChecksum;
+    checksum?: PrepareChecksum;
+    /** @deprecated Use checksum. Submit continues to accept legacy prepared artifacts. */
+    proof?: PrepareProof;
 };
 export type PrepareSubmitRefusal = RequirementRefusal & {
     prepareCommand: string;

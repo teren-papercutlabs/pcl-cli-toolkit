@@ -35,6 +35,7 @@ export type {
   JsonValue,
   PreparedDraft,
   PrepareChecksum,
+  PrepareProof,
   PrepareSubmitContract,
   PrepareSubmitDefinition,
   PrepareSubmitRefusal,

@@ -29,16 +29,18 @@ export function createPrepareSubmitContract(definition) {
     const validator = definition.validator;
     const prepareDraft = (draft, context) => {
         const validation = validator(draft, context);
+        const checksum = {
+            contractId: definition.id,
+            contractVersion: definition.version,
+            draftDigest: digest(draft),
+            validationDigest: digest(validation),
+        };
         return {
             draft,
             validation,
             readyToSubmit: validation.ok,
-            checksum: {
-                contractId: definition.id,
-                contractVersion: definition.version,
-                draftDigest: digest(draft),
-                validationDigest: digest(validation),
-            },
+            checksum,
+            proof: checksum,
         };
     };
     const refusal = (code, evaluation, message) => ({
@@ -61,17 +63,22 @@ export function createPrepareSubmitContract(definition) {
         },
         prepareDraft,
         async submit(prepared, context, commit) {
-            const checksumMatchesContract = prepared.checksum.contractId === definition.id
-                && prepared.checksum.contractVersion === definition.version;
+            const suppliedChecksum = readPreparedChecksum(prepared);
+            const checksumMatchesContract = suppliedChecksum !== null
+                && suppliedChecksum.contractId === definition.id
+                && suppliedChecksum.contractVersion === definition.version;
             const currentDraftDigest = safeDigest(prepared.draft);
-            const draftUnchanged = currentDraftDigest.ok
-                && prepared.checksum.draftDigest === currentDraftDigest.value;
+            const draftUnchanged = suppliedChecksum !== null
+                && currentDraftDigest.ok
+                && suppliedChecksum.draftDigest === currentDraftDigest.value;
             const currentValidation = validator(prepared.draft, context);
             const currentValidationDigest = safeDigest(currentValidation);
-            const validationUnchanged = currentValidationDigest.ok
-                && prepared.checksum.validationDigest === currentValidationDigest.value;
+            const validationUnchanged = suppliedChecksum !== null
+                && currentValidationDigest.ok
+                && suppliedChecksum.validationDigest === currentValidationDigest.value;
             if (!checksumMatchesContract || !draftUnchanged || !validationUnchanged) {
                 const reasons = [
+                    ...(suppliedChecksum === null ? ['prepared checksum/proof is missing or malformed'] : []),
                     ...(!checksumMatchesContract ? ['contract identity/version changed'] : []),
                     ...(!draftUnchanged
                         ? [currentDraftDigest.ok
@@ -96,6 +103,22 @@ export function createPrepareSubmitContract(definition) {
         },
     };
     return Object.freeze(contract);
+}
+function readPreparedChecksum(prepared) {
+    if (isPrepareChecksum(prepared.checksum))
+        return prepared.checksum;
+    if (isPrepareChecksum(prepared.proof))
+        return prepared.proof;
+    return null;
+}
+function isPrepareChecksum(value) {
+    if (typeof value !== 'object' || value === null)
+        return false;
+    const candidate = value;
+    return typeof candidate.contractId === 'string'
+        && Number.isInteger(candidate.contractVersion)
+        && typeof candidate.draftDigest === 'string'
+        && typeof candidate.validationDigest === 'string';
 }
 function digest(value) {
     return createHash('sha256').update(canonicalJson(value)).digest('hex');

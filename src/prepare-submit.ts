@@ -23,11 +23,16 @@ export type PrepareChecksum = {
   validationDigest: string;
 };
 
+/** @deprecated Use PrepareChecksum. Retained for prepared-artifact wire compatibility. */
+export type PrepareProof = PrepareChecksum;
+
 export type PreparedDraft<Draft> = {
   draft: Draft;
   validation: RequirementEvaluation;
   readyToSubmit: boolean;
-  checksum: PrepareChecksum;
+  checksum?: PrepareChecksum;
+  /** @deprecated Use checksum. Submit continues to accept legacy prepared artifacts. */
+  proof?: PrepareProof;
 };
 
 export type PrepareSubmitRefusal = RequirementRefusal & {
@@ -100,16 +105,18 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
 
   const prepareDraft = (draft: Draft, context: Readonly<Context>): PreparedDraft<Draft> => {
     const validation = validator(draft, context);
+    const checksum: PrepareChecksum = {
+      contractId: definition.id,
+      contractVersion: definition.version,
+      draftDigest: digest(draft),
+      validationDigest: digest(validation as unknown as JsonValue),
+    };
     return {
       draft,
       validation,
       readyToSubmit: validation.ok,
-      checksum: {
-        contractId: definition.id,
-        contractVersion: definition.version,
-        draftDigest: digest(draft),
-        validationDigest: digest(validation as unknown as JsonValue),
-      },
+      checksum,
+      proof: checksum,
     };
   };
 
@@ -138,18 +145,23 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
     },
     prepareDraft,
     async submit(prepared, context, commit) {
-      const checksumMatchesContract = prepared.checksum.contractId === definition.id
-        && prepared.checksum.contractVersion === definition.version;
+      const suppliedChecksum = readPreparedChecksum(prepared);
+      const checksumMatchesContract = suppliedChecksum !== null
+        && suppliedChecksum.contractId === definition.id
+        && suppliedChecksum.contractVersion === definition.version;
       const currentDraftDigest = safeDigest(prepared.draft);
-      const draftUnchanged = currentDraftDigest.ok
-        && prepared.checksum.draftDigest === currentDraftDigest.value;
+      const draftUnchanged = suppliedChecksum !== null
+        && currentDraftDigest.ok
+        && suppliedChecksum.draftDigest === currentDraftDigest.value;
       const currentValidation = validator(prepared.draft, context);
       const currentValidationDigest = safeDigest(currentValidation as unknown as JsonValue);
-      const validationUnchanged = currentValidationDigest.ok
-        && prepared.checksum.validationDigest === currentValidationDigest.value;
+      const validationUnchanged = suppliedChecksum !== null
+        && currentValidationDigest.ok
+        && suppliedChecksum.validationDigest === currentValidationDigest.value;
 
       if (!checksumMatchesContract || !draftUnchanged || !validationUnchanged) {
         const reasons = [
+          ...(suppliedChecksum === null ? ['prepared checksum/proof is missing or malformed'] : []),
           ...(!checksumMatchesContract ? ['contract identity/version changed'] : []),
           ...(!draftUnchanged
             ? [currentDraftDigest.ok
@@ -180,6 +192,21 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
   };
 
   return Object.freeze(contract);
+}
+
+function readPreparedChecksum<Draft>(prepared: PreparedDraft<Draft>): PrepareChecksum | null {
+  if (isPrepareChecksum(prepared.checksum)) return prepared.checksum;
+  if (isPrepareChecksum(prepared.proof)) return prepared.proof;
+  return null;
+}
+
+function isPrepareChecksum(value: unknown): value is PrepareChecksum {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Partial<PrepareChecksum>;
+  return typeof candidate.contractId === 'string'
+    && Number.isInteger(candidate.contractVersion)
+    && typeof candidate.draftDigest === 'string'
+    && typeof candidate.validationDigest === 'string';
 }
 
 function digest(value: JsonValue): string {
