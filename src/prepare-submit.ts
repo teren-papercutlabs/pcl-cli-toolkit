@@ -62,18 +62,21 @@ export type SubmitResult<Output> =
   | { ok: false; refusal: PrepareSubmitRefusal };
 
 export type PrepareSubmitDefinition<Input, Draft extends JsonObject, Context> = {
-  /**
-   * Noun-specific derivation fields are deliberately open and dynamically typed.
-   * Method-style derive implementations receive the frozen definition snapshot
-   * as `this`, so extras such as `prefix` remain directly usable.
-   */
-  [key: string]: any;
   id: string;
   version: number;
   subject: string;
   prepareCommand: string;
   derive: (input: Readonly<Input>, context: Readonly<Context>) => Draft;
   validator: PrepareSubmitValidator<Draft, Context>;
+};
+
+type InferredPrepareSubmitDefinition = {
+  id: string;
+  version: number;
+  subject: string;
+  prepareCommand: string;
+  derive: (...args: any[]) => JsonObject;
+  validator: (...args: any[]) => RequirementEvaluation;
 };
 
 export type PrepareSubmitContract<Input, Draft extends JsonObject, Context> = Readonly<{
@@ -114,9 +117,22 @@ export function createRequirementValidator<Draft, Context>(
  * drift is reported clearly. The checksum is not authentication: submit's
  * authority is always a fresh run of the closed-over validator.
  */
-export function createPrepareSubmitContract<Input, Draft extends JsonObject, Context>(
-  definition: PrepareSubmitDefinition<Input, Draft, Context>,
-): PrepareSubmitContract<Input, Draft, Context> {
+export function createPrepareSubmitContract<const Definition extends object>(
+  definition: Definition & ThisType<Readonly<Definition>>,
+): Definition extends InferredPrepareSubmitDefinition
+  ? PrepareSubmitContract<
+    Parameters<Definition['derive']>[0],
+    ReturnType<Definition['derive']>,
+    Parameters<Definition['derive']>[1]
+  >
+  : never;
+export function createPrepareSubmitContract(
+  definition: InferredPrepareSubmitDefinition,
+  ..._definitionShapeGate: never[]
+): PrepareSubmitContract<any, JsonObject, any> {
+  type Input = any;
+  type Draft = JsonObject;
+  type Context = any;
   const definitionSnapshot = Object.freeze({ ...definition });
   const id = definitionSnapshot.id;
   const version = definitionSnapshot.version;
@@ -124,9 +140,9 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
   const prepareCommand = definitionSnapshot.prepareCommand;
   const deriveFunction = definitionSnapshot.derive;
   const derive: PrepareSubmitDefinition<Input, Draft, Context>['derive'] = (input, context) => (
-    deriveFunction.call(definitionSnapshot, input, context)
+    deriveFunction.call(definitionSnapshot, input, context) as Draft
   );
-  const validator = definitionSnapshot.validator;
+  const validator = definitionSnapshot.validator as PrepareSubmitValidator<Draft, Context>;
 
   if (!id.trim()) throw new Error('prepare/submit contract id is required');
   if (!Number.isInteger(version) || version < 1) {

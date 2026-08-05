@@ -8,23 +8,14 @@ export function judgmentTodo(field, instruction) {
 export function createRequirementValidator(requirements) {
     return (draft, context) => evaluateRequirements(requirements(draft, context));
 }
-/**
- * Create the refusal-proof prepare/submit pair.
- *
- * The definition accepts exactly one validator. Both paths close over that exact
- * function, and the returned contract is frozen. Submit also verifies the
- * serializable checksum before committing, so ordinary draft or validation
- * drift is reported clearly. The checksum is not authentication: submit's
- * authority is always a fresh run of the closed-over validator.
- */
-export function createPrepareSubmitContract(definition) {
+export function createPrepareSubmitContract(definition, ..._definitionShapeGate) {
     const definitionSnapshot = Object.freeze({ ...definition });
     const id = definitionSnapshot.id;
     const version = definitionSnapshot.version;
     const subject = definitionSnapshot.subject;
     const prepareCommand = definitionSnapshot.prepareCommand;
     const deriveFunction = definitionSnapshot.derive;
-    const derive = (input, context) => (deriveFunction.call(definitionSnapshot, input, context));
+    const derive = (input, context) => deriveFunction.call(definitionSnapshot, input, context);
     const validator = definitionSnapshot.validator;
     if (!id.trim())
         throw new Error('prepare/submit contract id is required');

@@ -16,3 +16,16 @@ const methodStyleContract = createPrepareSubmitContract({
 const prepared = methodStyleContract.prepare({ value: 'payload' }, {});
 const typedValue: string = prepared.draft.value;
 void typedValue;
+
+createPrepareSubmitContract({
+  id: 'typed-method.typo',
+  version: 1,
+  subject: 'Typed method typo',
+  prepareCommand: 'pcl typed-method prepare',
+  prefix: 'typed',
+  derive(input: { value: string }, _context: Record<string, never>): { value: string } {
+    // @ts-expect-error exact inferred self type rejects misspelled definition fields
+    return { value: `${this.preparCommand}:${input.value}` };
+  },
+  validator: () => ({ ok: true, unmetRequirements: [] }),
+});

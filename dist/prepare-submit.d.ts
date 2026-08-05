@@ -42,18 +42,20 @@ export type SubmitResult<Output> = {
     refusal: PrepareSubmitRefusal;
 };
 export type PrepareSubmitDefinition<Input, Draft extends JsonObject, Context> = {
-    /**
-     * Noun-specific derivation fields are deliberately open and dynamically typed.
-     * Method-style derive implementations receive the frozen definition snapshot
-     * as `this`, so extras such as `prefix` remain directly usable.
-     */
-    [key: string]: any;
     id: string;
     version: number;
     subject: string;
     prepareCommand: string;
     derive: (input: Readonly<Input>, context: Readonly<Context>) => Draft;
     validator: PrepareSubmitValidator<Draft, Context>;
+};
+type InferredPrepareSubmitDefinition = {
+    id: string;
+    version: number;
+    subject: string;
+    prepareCommand: string;
+    derive: (...args: any[]) => JsonObject;
+    validator: (...args: any[]) => RequirementEvaluation;
 };
 export type PrepareSubmitContract<Input, Draft extends JsonObject, Context> = Readonly<{
     id: string;
@@ -80,4 +82,5 @@ export declare function createRequirementValidator<Draft, Context>(requirements:
  * drift is reported clearly. The checksum is not authentication: submit's
  * authority is always a fresh run of the closed-over validator.
  */
-export declare function createPrepareSubmitContract<Input, Draft extends JsonObject, Context>(definition: PrepareSubmitDefinition<Input, Draft, Context>): PrepareSubmitContract<Input, Draft, Context>;
+export declare function createPrepareSubmitContract<const Definition extends object>(definition: Definition & ThisType<Readonly<Definition>>): Definition extends InferredPrepareSubmitDefinition ? PrepareSubmitContract<Parameters<Definition['derive']>[0], ReturnType<Definition['derive']>, Parameters<Definition['derive']>[1]> : never;
+export {};
