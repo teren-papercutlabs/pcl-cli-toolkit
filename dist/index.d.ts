@@ -8,4 +8,6 @@ export type { CliResult, CliSuccess, CliFailure } from './result.js';
 export { describe, registerDescribe } from './describe.js';
 export type { CliManifest } from './describe.js';
 export { parseDate, parseNumber, parseEnum, requireHumanApproval } from './validate.js';
+export { evaluateRequirements, buildRequirementRefusal } from './requirements.js';
+export type { Requirement, RequirementEvaluation, RequirementRefusal, RequirementResult, UnmetRequirement, } from './requirements.js';
 export { readInput } from './input.js';

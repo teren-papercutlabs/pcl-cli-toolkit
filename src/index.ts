@@ -14,5 +14,15 @@ export type { CliManifest } from './describe.js';
 // Validation
 export { parseDate, parseNumber, parseEnum, requireHumanApproval } from './validate.js';
 
+// Requirement evaluation
+export { evaluateRequirements, buildRequirementRefusal } from './requirements.js';
+export type {
+  Requirement,
+  RequirementEvaluation,
+  RequirementRefusal,
+  RequirementResult,
+  UnmetRequirement,
+} from './requirements.js';
+
 // Input
 export { readInput } from './input.js';
