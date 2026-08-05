@@ -17,7 +17,8 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "pnpm build && node --test test/*.test.mjs"
+    "test": "pnpm build && pnpm test:types && node --test test/*.test.mjs",
+    "test:types": "tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --types node test/prepare-submit.typecheck.ts"
   },
   "peerDependencies": {
     "commander": ">=11.0.0"

@@ -42,7 +42,12 @@ export type SubmitResult<Output> = {
     refusal: PrepareSubmitRefusal;
 };
 export type PrepareSubmitDefinition<Input, Draft extends JsonObject, Context> = {
-    [key: string]: unknown;
+    /**
+     * Noun-specific derivation fields are deliberately open and dynamically typed.
+     * Method-style derive implementations receive the frozen definition snapshot
+     * as `this`, so extras such as `prefix` remain directly usable.
+     */
+    [key: string]: any;
     id: string;
     version: number;
     subject: string;

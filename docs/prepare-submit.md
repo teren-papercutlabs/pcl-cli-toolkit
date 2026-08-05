@@ -6,6 +6,8 @@ The definition supplies derivation and exactly one validator. The contract close
 
 Prepared output also carries the same checksum under deprecated `proof` for wire compatibility. `PreparedDraft.checksum` remains required for current TypeScript callers; only `contract.submit` widens its input to `SubmittablePreparedDraft`, which also accepts the exported legacy proof-only shape. Missing or malformed metadata returns a structured `PREPARE_SUBMIT_DIVERGENCE`; it never bypasses validation or reaches persistence.
 
+Definitions may carry noun-specific enumerable fields. A method-style `derive` reads them through `this`; the toolkit shallow-snapshots and freezes that full definition at contract creation. These extra fields are deliberately dynamically typed so direct object-literal authoring such as `prefix: string` plus `this.prefix` compiles without a second schema type.
+
 ```ts
 const create = createPrepareSubmitContract({
   id: 'wb.create',
