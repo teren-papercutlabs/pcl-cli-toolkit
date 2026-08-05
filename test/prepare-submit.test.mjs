@@ -137,3 +137,39 @@ test('prepare proof survives JSON transport between CLI processes', async () => 
   const submitted = await contract.submit(transported, { sessionId: 'session-9' }, (draft) => draft.title);
   assert.deepEqual(submitted, { ok: true, output: 'Ship it' });
 });
+
+for (const nonFinite of [Number.NaN, Number.POSITIVE_INFINITY]) {
+  test(`null-to-${String(nonFinite)} tampering cannot collide with a prepared proof`, async () => {
+    const contract = createPrepareSubmitContract({
+      id: 'numeric.create',
+      version: 1,
+      subject: 'Numeric create',
+      prepareCommand: 'pcl numeric prepare',
+      derive: (input) => ({ value: input.value }),
+      validator: () => ({ ok: true, unmetRequirements: [] }),
+    });
+    const prepared = contract.prepare({ value: null }, {});
+    prepared.draft.value = nonFinite;
+
+    const submitted = await contract.submit(prepared, {}, () => assert.fail('commit must not run'));
+    assert.equal(submitted.ok, false);
+    assert.equal(submitted.refusal.code, 'PREPARE_SUBMIT_DIVERGENCE');
+    assert.match(submitted.refusal.message, /finite JSON numbers/);
+  });
+}
+
+test('prepare itself rejects non-finite numbers instead of issuing a colliding proof', () => {
+  const contract = createPrepareSubmitContract({
+    id: 'numeric.create',
+    version: 1,
+    subject: 'Numeric create',
+    prepareCommand: 'pcl numeric prepare',
+    derive: (input) => ({ value: input.value }),
+    validator: () => ({ ok: true, unmetRequirements: [] }),
+  });
+
+  assert.throws(
+    () => contract.prepare({ value: Number.NEGATIVE_INFINITY }, {}),
+    /prepare\/submit proofs require finite JSON numbers/,
+  );
+});

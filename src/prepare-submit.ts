@@ -138,16 +138,27 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
     async submit(prepared, context, commit) {
       const proofMatchesContract = prepared.proof.contractId === definition.id
         && prepared.proof.contractVersion === definition.version;
-      const draftUnchanged = prepared.proof.draftDigest === digest(prepared.draft);
+      const currentDraftDigest = safeDigest(prepared.draft);
+      const draftUnchanged = currentDraftDigest.ok
+        && prepared.proof.draftDigest === currentDraftDigest.value;
       const currentValidation = validator(prepared.draft, context);
-      const validationUnchanged = prepared.proof.validationDigest
-        === digest(currentValidation as unknown as JsonValue);
+      const currentValidationDigest = safeDigest(currentValidation as unknown as JsonValue);
+      const validationUnchanged = currentValidationDigest.ok
+        && prepared.proof.validationDigest === currentValidationDigest.value;
 
       if (!proofMatchesContract || !draftUnchanged || !validationUnchanged) {
         const reasons = [
           ...(!proofMatchesContract ? ['contract identity/version changed'] : []),
-          ...(!draftUnchanged ? ['draft changed after prepare'] : []),
-          ...(!validationUnchanged ? ['validator result diverged after prepare'] : []),
+          ...(!draftUnchanged
+            ? [currentDraftDigest.ok
+              ? 'draft changed after prepare'
+              : `draft cannot be proven: ${currentDraftDigest.error.message}`]
+            : []),
+          ...(!validationUnchanged
+            ? [currentValidationDigest.ok
+              ? 'validator result diverged after prepare'
+              : `validator result cannot be proven: ${currentValidationDigest.error.message}`]
+            : []),
         ];
         return {
           ok: false,
@@ -173,8 +184,28 @@ function digest(value: JsonValue): string {
   return createHash('sha256').update(canonicalJson(value)).digest('hex');
 }
 
+function safeDigest(value: JsonValue):
+  | { ok: true; value: string }
+  | { ok: false; error: Error } {
+  try {
+    return { ok: true, value: digest(value) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+}
+
 function canonicalJson(value: JsonValue): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (value === null) return 'null';
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new TypeError('prepare/submit proofs require finite JSON numbers');
+    }
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
   return `{${entries.map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`).join(',')}}`;
