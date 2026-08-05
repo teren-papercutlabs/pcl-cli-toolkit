@@ -1,0 +1,139 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  createPrepareSubmitContract,
+  createRequirementValidator,
+  judgmentTodo,
+} from '../dist/index.js';
+
+function exampleContract(validator) {
+  return createPrepareSubmitContract({
+    id: 'example.create',
+    version: 1,
+    subject: 'Example create',
+    prepareCommand: 'pcl example prepare',
+    derive(input, context) {
+      return {
+        title: input.title ?? judgmentTodo('title', 'supply a useful title'),
+        consequence: input.consequence ?? judgmentTodo('consequence'),
+        dedupeKey: `${context.sessionId}:${input.parentId}`,
+        dispatchClass: 'spawn',
+      };
+    },
+    validator,
+  });
+}
+
+function requiredDraftValidator() {
+  const fields = ['title', 'consequence', 'dedupeKey', 'dispatchClass', 'runtime', 'workerRepo'];
+  return createRequirementValidator((draft) => fields.map((field) => ({
+    code: `${field.toUpperCase()}_REQUIRED`,
+    field,
+    message: `${field} is required`,
+    fix: `set ${field}`,
+    evaluate: () => typeof draft[field] === 'string'
+      && draft[field].length > 0
+      && !draft[field].startsWith('TODO('),
+  })));
+}
+
+test('prepare derives deterministic fields, marks judgment TODOs, and aggregates every issue', () => {
+  const validator = requiredDraftValidator();
+  const contract = exampleContract(validator);
+  const prepared = contract.prepare(
+    { parentId: 'wb-1' },
+    { sessionId: 'session-9' },
+  );
+
+  assert.equal(contract.validator, validator);
+  assert.equal(Object.isFrozen(contract), true);
+  assert.equal(prepared.draft.dedupeKey, 'session-9:wb-1');
+  assert.equal(prepared.draft.dispatchClass, 'spawn');
+  assert.match(prepared.draft.title, /^TODO\(title\)/);
+  assert.deepEqual(
+    prepared.validation.unmetRequirements.map((issue) => issue.field),
+    ['title', 'consequence', 'runtime', 'workerRepo'],
+  );
+  assert.equal(prepared.readyToSubmit, false);
+});
+
+test('a green prepared draft submits unchanged through the same validator', async () => {
+  const validator = requiredDraftValidator();
+  const contract = exampleContract(validator);
+  const prepared = contract.prepareDraft({
+    title: 'Ship it',
+    consequence: 'The operation becomes deterministic',
+    dedupeKey: 'session-9:wb-1',
+    dispatchClass: 'spawn',
+    runtime: 'codex',
+    workerRepo: 'marshal',
+  }, { sessionId: 'session-9' });
+
+  assert.equal(prepared.readyToSubmit, true);
+  const submitted = await contract.submit(prepared, { sessionId: 'session-9' }, async (draft) => draft.dedupeKey);
+  assert.deepEqual(submitted, { ok: true, output: 'session-9:wb-1' });
+});
+
+test('submit refuses all unmet requirements in one envelope and points at prepare', async () => {
+  const contract = exampleContract(requiredDraftValidator());
+  const prepared = contract.prepareDraft({
+    title: '', consequence: '', dedupeKey: '', dispatchClass: '', runtime: '', workerRepo: '',
+  }, { sessionId: 'session-9' });
+  let committed = false;
+  const submitted = await contract.submit(prepared, { sessionId: 'session-9' }, () => { committed = true; });
+
+  assert.equal(submitted.ok, false);
+  assert.equal(committed, false);
+  assert.equal(submitted.refusal.code, 'REQUIREMENTS_UNMET');
+  assert.equal(submitted.refusal.unmetRequirements.length, 6);
+  assert.equal(submitted.refusal.prepareCommand, 'pcl example prepare');
+  assert.match(submitted.refusal.hint, /pcl example prepare/);
+});
+
+test('draft mutation after prepare fails closed before commit', async () => {
+  const contract = exampleContract(requiredDraftValidator());
+  const prepared = contract.prepareDraft({
+    title: 'Ship it', consequence: 'Safe', dedupeKey: 'a', dispatchClass: 'spawn', runtime: 'codex', workerRepo: 'marshal',
+  }, { sessionId: 'session-9' });
+  prepared.draft.title = 'changed after prepare';
+
+  const submitted = await contract.submit(prepared, { sessionId: 'session-9' }, () => assert.fail('commit must not run'));
+  assert.equal(submitted.ok, false);
+  assert.equal(submitted.refusal.code, 'PREPARE_SUBMIT_DIVERGENCE');
+  assert.match(submitted.refusal.message, /draft changed after prepare/);
+});
+
+test('injected validator divergence fails closed and proves prepare/submit identity protection', async () => {
+  let calls = 0;
+  const validator = () => {
+    calls += 1;
+    return calls === 1
+      ? { ok: true, unmetRequirements: [] }
+      : {
+          ok: false,
+          unmetRequirements: [{
+            code: 'INJECTED_DIVERGENCE', field: 'validator', message: 'injected', fix: 'remove divergence',
+          }],
+        };
+  };
+  const contract = exampleContract(validator);
+  const prepared = contract.prepareDraft({ title: 'x' }, { sessionId: 'session-9' });
+  assert.equal(prepared.readyToSubmit, true);
+
+  const submitted = await contract.submit(prepared, { sessionId: 'session-9' }, () => assert.fail('commit must not run'));
+  assert.equal(submitted.ok, false);
+  assert.equal(submitted.refusal.code, 'PREPARE_SUBMIT_DIVERGENCE');
+  assert.match(submitted.refusal.message, /validator result diverged after prepare/);
+  assert.equal(contract.validator, validator);
+});
+
+test('prepare proof survives JSON transport between CLI processes', async () => {
+  const contract = exampleContract(requiredDraftValidator());
+  const prepared = contract.prepareDraft({
+    title: 'Ship it', consequence: 'Safe', dedupeKey: 'a', dispatchClass: 'spawn', runtime: 'codex', workerRepo: 'marshal',
+  }, { sessionId: 'session-9' });
+  const transported = JSON.parse(JSON.stringify(prepared));
+
+  const submitted = await contract.submit(transported, { sessionId: 'session-9' }, (draft) => draft.title);
+  assert.deepEqual(submitted, { ok: true, output: 'Ship it' });
+});
