@@ -26,3 +26,21 @@ export type {
 
 // Input
 export { readInput } from './input.js';
+
+// Refusal-proof prepare/submit contracts
+export { createPrepareSubmitContract, createRequirementValidator, judgmentTodo } from './prepare-submit.js';
+export type {
+  JsonObject,
+  JsonPrimitive,
+  JsonValue,
+  LegacyPreparedDraft,
+  PreparedDraft,
+  PrepareChecksum,
+  PrepareProof,
+  PrepareSubmitContract,
+  PrepareSubmitDefinition,
+  PrepareSubmitRefusal,
+  PrepareSubmitValidator,
+  SubmittablePreparedDraft,
+  SubmitResult,
+} from './prepare-submit.js';
