@@ -2,7 +2,7 @@
 
 Use `createPrepareSubmitContract` when a CLI noun has a draft-producing `prepare` command and a state-changing `submit` command.
 
-The definition supplies derivation and exactly one validator. The contract closes both paths over that validator, aggregates requirements through `createRequirementValidator`, and emits a serializable proof binding the contract version, draft, and validation result. Submit revalidates and fails closed on changed drafts, changed contract versions, or validator divergence before the mutation callback runs.
+The definition supplies derivation and exactly one validator. The contract closes both paths over that validator, aggregates requirements through `createRequirementValidator`, and emits a serializable checksum for the contract version, draft, and validation result. The checksum catches accidental changes and stale wrappers; it is public data, not authentication or a tamper-proof token. Submit always reruns the closed-over validator and only invokes the mutation callback when that current result is green.
 
 ```ts
 const create = createPrepareSubmitContract({
@@ -17,7 +17,7 @@ const create = createPrepareSubmitContract({
   validator: createRequirementValidator((draft) => requirementsFor(draft)),
 });
 
-const prepared = create.prepare(input, context); // emit draft + validation + proof
+const prepared = create.prepare(input, context); // emit draft + validation + checksum
 const result = await create.submit(prepared, context, persist); // persist runs only when green and unchanged
 ```
 
@@ -25,6 +25,6 @@ Adoption rules:
 
 1. Derive machine-known fields; mark genuine judgment with `judgmentTodo`.
 2. Declare every requirement together. Never short-circuit or duplicate validation in the command.
-3. Emit the complete `PreparedDraft` so its proof survives a separate CLI process.
+3. Emit the complete `PreparedDraft` so its accidental-change checksum survives a separate CLI process. Never treat it as authentication.
 4. Submit only through `contract.submit`; surface its refusal unchanged. The hint points back to prepare.
 5. Increment `version` when derivation or validation semantics change.

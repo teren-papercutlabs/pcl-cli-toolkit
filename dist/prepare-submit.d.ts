@@ -5,7 +5,8 @@ export type JsonObject = {
     readonly [key: string]: JsonValue;
 };
 export type PrepareSubmitValidator<Draft, Context> = (draft: Readonly<Draft>, context: Readonly<Context>) => RequirementEvaluation;
-export type PrepareProof = {
+/** Accidental-change checksum. This is not an authentication or tamper-proof token. */
+export type PrepareChecksum = {
     contractId: string;
     contractVersion: number;
     draftDigest: string;
@@ -15,7 +16,7 @@ export type PreparedDraft<Draft> = {
     draft: Draft;
     validation: RequirementEvaluation;
     readyToSubmit: boolean;
-    proof: PrepareProof;
+    checksum: PrepareChecksum;
 };
 export type PrepareSubmitRefusal = RequirementRefusal & {
     prepareCommand: string;
@@ -56,7 +57,8 @@ export declare function createRequirementValidator<Draft, Context>(requirements:
  *
  * The definition accepts exactly one validator. Both paths close over that exact
  * function, and the returned contract is frozen. Submit also verifies the
- * serializable prepare proof before committing, so draft or validation drift
- * fails closed instead of reaching the mutation.
+ * serializable checksum before committing, so ordinary draft or validation
+ * drift is reported clearly. The checksum is not authentication: submit's
+ * authority is always a fresh run of the closed-over validator.
  */
 export declare function createPrepareSubmitContract<Input, Draft extends JsonObject, Context>(definition: PrepareSubmitDefinition<Input, Draft, Context>): PrepareSubmitContract<Input, Draft, Context>;

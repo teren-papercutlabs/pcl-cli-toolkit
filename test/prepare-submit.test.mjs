@@ -127,7 +127,7 @@ test('injected validator divergence fails closed and proves prepare/submit ident
   assert.equal(contract.validator, validator);
 });
 
-test('prepare proof survives JSON transport between CLI processes', async () => {
+test('prepare checksum survives JSON transport between CLI processes', async () => {
   const contract = exampleContract(requiredDraftValidator());
   const prepared = contract.prepareDraft({
     title: 'Ship it', consequence: 'Safe', dedupeKey: 'a', dispatchClass: 'spawn', runtime: 'codex', workerRepo: 'marshal',
@@ -139,7 +139,7 @@ test('prepare proof survives JSON transport between CLI processes', async () => 
 });
 
 for (const nonFinite of [Number.NaN, Number.POSITIVE_INFINITY]) {
-  test(`null-to-${String(nonFinite)} tampering cannot collide with a prepared proof`, async () => {
+  test(`a null-to-${String(nonFinite)} change is rejected during checksum comparison`, async () => {
     const contract = createPrepareSubmitContract({
       id: 'numeric.create',
       version: 1,
@@ -158,7 +158,7 @@ for (const nonFinite of [Number.NaN, Number.POSITIVE_INFINITY]) {
   });
 }
 
-test('prepare itself rejects non-finite numbers instead of issuing a colliding proof', () => {
+test('prepare itself rejects non-finite numbers instead of issuing a colliding checksum', () => {
   const contract = createPrepareSubmitContract({
     id: 'numeric.create',
     version: 1,
@@ -170,6 +170,28 @@ test('prepare itself rejects non-finite numbers instead of issuing a colliding p
 
   assert.throws(
     () => contract.prepare({ value: Number.NEGATIVE_INFINITY }, {}),
-    /prepare\/submit proofs require finite JSON numbers/,
+    /prepare\/submit checksums require finite JSON numbers/,
   );
+});
+
+test('a forged checksum cannot bypass a red validator', async () => {
+  const contract = exampleContract(requiredDraftValidator());
+  const green = contract.prepareDraft({
+    title: 'Ship it', consequence: 'Safe', dedupeKey: 'a', dispatchClass: 'spawn', runtime: 'codex', workerRepo: 'marshal',
+  }, { sessionId: 'session-9' });
+  const red = contract.prepareDraft({
+    title: '', consequence: 'Safe', dedupeKey: 'a', dispatchClass: 'spawn', runtime: 'codex', workerRepo: 'marshal',
+  }, { sessionId: 'session-9' });
+
+  // Digests are public checksums. Simulate a caller recomputing both after mutation.
+  green.draft.title = '';
+  green.checksum.draftDigest = red.checksum.draftDigest;
+  green.checksum.validationDigest = red.checksum.validationDigest;
+  let committed = false;
+  const submitted = await contract.submit(green, { sessionId: 'session-9' }, () => { committed = true; });
+
+  assert.equal(submitted.ok, false);
+  assert.equal(submitted.refusal.code, 'REQUIREMENTS_UNMET');
+  assert.deepEqual(submitted.refusal.unmetRequirements.map((issue) => issue.field), ['title']);
+  assert.equal(committed, false);
 });

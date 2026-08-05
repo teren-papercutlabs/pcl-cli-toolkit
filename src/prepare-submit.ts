@@ -15,7 +15,8 @@ export type PrepareSubmitValidator<Draft, Context> = (
   context: Readonly<Context>,
 ) => RequirementEvaluation;
 
-export type PrepareProof = {
+/** Accidental-change checksum. This is not an authentication or tamper-proof token. */
+export type PrepareChecksum = {
   contractId: string;
   contractVersion: number;
   draftDigest: string;
@@ -26,7 +27,7 @@ export type PreparedDraft<Draft> = {
   draft: Draft;
   validation: RequirementEvaluation;
   readyToSubmit: boolean;
-  proof: PrepareProof;
+  checksum: PrepareChecksum;
 };
 
 export type PrepareSubmitRefusal = RequirementRefusal & {
@@ -80,8 +81,9 @@ export function createRequirementValidator<Draft, Context>(
  *
  * The definition accepts exactly one validator. Both paths close over that exact
  * function, and the returned contract is frozen. Submit also verifies the
- * serializable prepare proof before committing, so draft or validation drift
- * fails closed instead of reaching the mutation.
+ * serializable checksum before committing, so ordinary draft or validation
+ * drift is reported clearly. The checksum is not authentication: submit's
+ * authority is always a fresh run of the closed-over validator.
  */
 export function createPrepareSubmitContract<Input, Draft extends JsonObject, Context>(
   definition: PrepareSubmitDefinition<Input, Draft, Context>,
@@ -102,7 +104,7 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
       draft,
       validation,
       readyToSubmit: validation.ok,
-      proof: {
+      checksum: {
         contractId: definition.id,
         contractVersion: definition.version,
         draftDigest: digest(draft),
@@ -136,19 +138,19 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
     },
     prepareDraft,
     async submit(prepared, context, commit) {
-      const proofMatchesContract = prepared.proof.contractId === definition.id
-        && prepared.proof.contractVersion === definition.version;
+      const checksumMatchesContract = prepared.checksum.contractId === definition.id
+        && prepared.checksum.contractVersion === definition.version;
       const currentDraftDigest = safeDigest(prepared.draft);
       const draftUnchanged = currentDraftDigest.ok
-        && prepared.proof.draftDigest === currentDraftDigest.value;
+        && prepared.checksum.draftDigest === currentDraftDigest.value;
       const currentValidation = validator(prepared.draft, context);
       const currentValidationDigest = safeDigest(currentValidation as unknown as JsonValue);
       const validationUnchanged = currentValidationDigest.ok
-        && prepared.proof.validationDigest === currentValidationDigest.value;
+        && prepared.checksum.validationDigest === currentValidationDigest.value;
 
-      if (!proofMatchesContract || !draftUnchanged || !validationUnchanged) {
+      if (!checksumMatchesContract || !draftUnchanged || !validationUnchanged) {
         const reasons = [
-          ...(!proofMatchesContract ? ['contract identity/version changed'] : []),
+          ...(!checksumMatchesContract ? ['contract identity/version changed'] : []),
           ...(!draftUnchanged
             ? [currentDraftDigest.ok
               ? 'draft changed after prepare'
@@ -201,7 +203,7 @@ function canonicalJson(value: JsonValue): string {
   if (value === null) return 'null';
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new TypeError('prepare/submit proofs require finite JSON numbers');
+      throw new TypeError('prepare/submit checksums require finite JSON numbers');
     }
     return JSON.stringify(value);
   }
