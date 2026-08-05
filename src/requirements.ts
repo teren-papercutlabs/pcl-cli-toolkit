@@ -5,6 +5,7 @@ export type UnmetRequirement = {
   fix: string;
   expected?: unknown;
   actual?: unknown;
+  evaluationError?: { name: string; message: string };
 };
 
 export type RequirementResult =
@@ -40,7 +41,24 @@ export function evaluateRequirements(
 ): RequirementEvaluation {
   const unmetRequirements: UnmetRequirement[] = [];
   for (const requirement of requirements) {
-    const result = requirement.evaluate();
+    let result: RequirementResult;
+    try {
+      result = requirement.evaluate();
+    } catch (error) {
+      const caught = error instanceof Error
+        ? { name: error.name, message: error.message }
+        : { name: 'Error', message: String(error) };
+      unmetRequirements.push({
+        code: requirement.code,
+        field: requirement.field,
+        message: requirement.message,
+        fix: requirement.fix,
+        ...(requirement.expected === undefined ? {} : { expected: requirement.expected }),
+        ...(requirement.actual === undefined ? {} : { actual: requirement.actual }),
+        evaluationError: caught,
+      });
+      continue;
+    }
     if (result === true) continue;
     const details = result === false ? {} : result;
     unmetRequirements.push({

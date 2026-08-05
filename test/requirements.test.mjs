@@ -98,3 +98,20 @@ test('returns null when every requirement passes', () => {
     evaluation,
   }), null);
 });
+
+test('records a throwing evaluator and continues through later requirements', () => {
+  const visited = [];
+  const evaluation = evaluateRequirements([
+    {
+      code: 'BROKEN_CHECK', field: 'broken', message: 'broken must be known', fix: 'pcl repair-check',
+      evaluate: () => { visited.push('broken'); throw new TypeError('instrument unavailable'); },
+    },
+    {
+      code: 'LATER_REQUIRED', field: 'later', message: 'later is required', fix: 'pcl example --later value',
+      evaluate: () => { visited.push('later'); return false; },
+    },
+  ]);
+  assert.deepEqual(visited, ['broken', 'later']);
+  assert.deepEqual(evaluation.unmetRequirements.map((item) => item.code), ['BROKEN_CHECK', 'LATER_REQUIRED']);
+  assert.deepEqual(evaluation.unmetRequirements[0].evaluationError, { name: 'TypeError', message: 'instrument unavailable' });
+});

@@ -5,6 +5,10 @@ export type UnmetRequirement = {
     fix: string;
     expected?: unknown;
     actual?: unknown;
+    evaluationError?: {
+        name: string;
+        message: string;
+    };
 };
 export type RequirementResult = boolean | Omit<UnmetRequirement, 'code' | 'field' | 'message' | 'fix'>;
 export type Requirement = {
