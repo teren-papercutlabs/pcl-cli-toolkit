@@ -213,7 +213,9 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
 }
 
 function readPreparedChecksum<Draft>(prepared: SubmittablePreparedDraft<Draft>): PrepareChecksum | null {
-  if (isPrepareChecksum(prepared.checksum)) return prepared.checksum;
+  if (Object.prototype.hasOwnProperty.call(prepared, 'checksum')) {
+    return isPrepareChecksum(prepared.checksum) ? prepared.checksum : null;
+  }
   if (isPrepareChecksum(prepared.proof)) return prepared.proof;
   return null;
 }

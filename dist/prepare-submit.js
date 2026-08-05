@@ -105,8 +105,9 @@ export function createPrepareSubmitContract(definition) {
     return Object.freeze(contract);
 }
 function readPreparedChecksum(prepared) {
-    if (isPrepareChecksum(prepared.checksum))
-        return prepared.checksum;
+    if (Object.prototype.hasOwnProperty.call(prepared, 'checksum')) {
+        return isPrepareChecksum(prepared.checksum) ? prepared.checksum : null;
+    }
     if (isPrepareChecksum(prepared.proof))
         return prepared.proof;
     return null;

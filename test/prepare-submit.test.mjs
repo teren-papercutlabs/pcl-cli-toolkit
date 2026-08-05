@@ -208,6 +208,21 @@ test('submit accepts the legacy proof-only prepared artifact shape', async () =>
   assert.deepEqual(submitted, { ok: true, output: 'Ship it' });
 });
 
+test('a present malformed checksum refuses instead of falling back to intact deprecated proof', async () => {
+  const contract = exampleContract(requiredDraftValidator());
+  const prepared = contract.prepareDraft({
+    title: 'Ship it', consequence: 'Safe', dedupeKey: 'a', dispatchClass: 'spawn', runtime: 'codex', workerRepo: 'marshal',
+  }, { sessionId: 'session-9' });
+  prepared.checksum = {};
+  let committed = false;
+
+  const submitted = await contract.submit(prepared, { sessionId: 'session-9' }, () => { committed = true; });
+  assert.equal(submitted.ok, false);
+  assert.equal(submitted.refusal.code, 'PREPARE_SUBMIT_DIVERGENCE');
+  assert.match(submitted.refusal.message, /missing or malformed/);
+  assert.equal(committed, false);
+});
+
 for (const malformed of [undefined, null, 'not-a-checksum', {}, { contractId: 'example.create' }]) {
   test(`missing or malformed checksum metadata refuses structurally: ${JSON.stringify(malformed)}`, async () => {
     const contract = exampleContract(requiredDraftValidator());
