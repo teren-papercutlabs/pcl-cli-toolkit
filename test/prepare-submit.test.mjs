@@ -223,6 +223,72 @@ test('a present malformed checksum refuses instead of falling back to intact dep
   assert.equal(committed, false);
 });
 
+test('contract behavior snapshots every definition field and function at creation', async () => {
+  const originalValidator = requiredDraftValidator();
+  const definition = {
+    id: 'snapshot.create',
+    version: 1,
+    subject: 'Snapshot create',
+    prepareCommand: 'pcl snapshot prepare',
+    derive: (input) => ({ ...input, source: 'original' }),
+    validator: originalValidator,
+  };
+  const contract = createPrepareSubmitContract(definition);
+
+  definition.id = 'mutated.create';
+  definition.version = 99;
+  definition.subject = 'Mutated create';
+  definition.prepareCommand = 'pcl mutated prepare';
+  definition.derive = () => ({ source: 'mutated' });
+  definition.validator = () => ({
+    ok: false,
+    unmetRequirements: [{ code: 'MUTATED', field: 'definition', message: 'mutated', fix: 'restore' }],
+  });
+
+  const prepared = contract.prepare({
+    title: 'Ship it', consequence: 'Safe', dedupeKey: 'a', dispatchClass: 'spawn', runtime: 'codex', workerRepo: 'marshal',
+  }, {});
+  assert.equal(contract.id, 'snapshot.create');
+  assert.equal(contract.version, 1);
+  assert.equal(contract.subject, 'Snapshot create');
+  assert.equal(contract.prepareCommand, 'pcl snapshot prepare');
+  assert.equal(contract.derive({ value: 'x' }, {}).source, 'original');
+  assert.equal(contract.validator, originalValidator);
+  assert.equal(prepared.draft.source, 'original');
+  assert.equal(prepared.readyToSubmit, true);
+
+  const submitted = await contract.submit(prepared, {}, (draft) => draft.source);
+  assert.deepEqual(submitted, { ok: true, output: 'original' });
+});
+
+test('undefined validation metadata follows JSON transport semantics', async () => {
+  const contract = createPrepareSubmitContract({
+    id: 'metadata.create',
+    version: 1,
+    subject: 'Metadata create',
+    prepareCommand: 'pcl metadata prepare',
+    derive: (input) => input,
+    validator: createRequirementValidator(() => [{
+      code: 'VALUE_REQUIRED',
+      field: 'value',
+      message: 'value is required',
+      fix: 'set value',
+      evaluate: () => ({ actual: undefined, expected: 'present' }),
+    }]),
+  });
+
+  const prepared = contract.prepare({ value: null }, {});
+  assert.equal(prepared.readyToSubmit, false);
+  assert.equal(Object.hasOwn(prepared.validation.unmetRequirements[0], 'actual'), true);
+  const transported = JSON.parse(JSON.stringify(prepared));
+  assert.equal(Object.hasOwn(transported.validation.unmetRequirements[0], 'actual'), false);
+
+  const submitted = await contract.submit(transported, {}, () => assert.fail('commit must not run'));
+  assert.equal(submitted.ok, false);
+  assert.equal(submitted.refusal.code, 'REQUIREMENTS_UNMET');
+  assert.deepEqual(submitted.refusal.unmetRequirements.map((issue) => issue.field), ['value']);
+});
+
 for (const malformed of [undefined, null, 'not-a-checksum', {}, { contractId: 'example.create' }]) {
   test(`missing or malformed checksum metadata refuses structurally: ${JSON.stringify(malformed)}`, async () => {
     const contract = exampleContract(requiredDraftValidator());

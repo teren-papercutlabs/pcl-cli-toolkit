@@ -111,23 +111,28 @@ export function createRequirementValidator<Draft, Context>(
 export function createPrepareSubmitContract<Input, Draft extends JsonObject, Context>(
   definition: PrepareSubmitDefinition<Input, Draft, Context>,
 ): PrepareSubmitContract<Input, Draft, Context> {
-  if (!definition.id.trim()) throw new Error('prepare/submit contract id is required');
-  if (!Number.isInteger(definition.version) || definition.version < 1) {
+  const id = definition.id;
+  const version = definition.version;
+  const subject = definition.subject;
+  const prepareCommand = definition.prepareCommand;
+  const derive = definition.derive;
+  const validator = definition.validator;
+
+  if (!id.trim()) throw new Error('prepare/submit contract id is required');
+  if (!Number.isInteger(version) || version < 1) {
     throw new Error('prepare/submit contract version must be a positive integer');
   }
-  if (!definition.prepareCommand.trim()) {
+  if (!prepareCommand.trim()) {
     throw new Error('prepare/submit prepareCommand is required');
   }
-
-  const validator = definition.validator;
 
   const prepareDraft = (draft: Draft, context: Readonly<Context>): PreparedDraft<Draft> => {
     const validation = validator(draft, context);
     const checksum: PrepareChecksum = {
-      contractId: definition.id,
-      contractVersion: definition.version,
+      contractId: id,
+      contractVersion: version,
       draftDigest: digest(draft),
-      validationDigest: digest(validation as unknown as JsonValue),
+      validationDigest: digestTransport(validation),
     };
     return {
       draft,
@@ -144,35 +149,35 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
     message?: string,
   ): PrepareSubmitRefusal => ({
     code,
-    message: message ?? `${definition.subject} refused with ${evaluation.unmetRequirements.length} unmet requirement${evaluation.unmetRequirements.length === 1 ? '' : 's'}.`,
-    hint: `Run ${definition.prepareCommand}; resolve every unmetRequirements[].fix; then submit the unchanged green draft.`,
+    message: message ?? `${subject} refused with ${evaluation.unmetRequirements.length} unmet requirement${evaluation.unmetRequirements.length === 1 ? '' : 's'}.`,
+    hint: `Run ${prepareCommand}; resolve every unmetRequirements[].fix; then submit the unchanged green draft.`,
     unmetRequirements: evaluation.unmetRequirements,
-    requirementContract: { id: definition.id, version: definition.version },
-    prepareCommand: definition.prepareCommand,
+    requirementContract: { id, version },
+    prepareCommand,
   });
 
   const contract: PrepareSubmitContract<Input, Draft, Context> = {
-    id: definition.id,
-    version: definition.version,
-    subject: definition.subject,
-    prepareCommand: definition.prepareCommand,
-    derive: definition.derive,
+    id,
+    version,
+    subject,
+    prepareCommand,
+    derive,
     validator,
     prepare(input, context) {
-      return prepareDraft(definition.derive(input, context), context);
+      return prepareDraft(derive(input, context), context);
     },
     prepareDraft,
     async submit(prepared, context, commit) {
       const suppliedChecksum = readPreparedChecksum(prepared);
       const checksumMatchesContract = suppliedChecksum !== null
-        && suppliedChecksum.contractId === definition.id
-        && suppliedChecksum.contractVersion === definition.version;
+        && suppliedChecksum.contractId === id
+        && suppliedChecksum.contractVersion === version;
       const currentDraftDigest = safeDigest(prepared.draft);
       const draftUnchanged = suppliedChecksum !== null
         && currentDraftDigest.ok
         && suppliedChecksum.draftDigest === currentDraftDigest.value;
       const currentValidation = validator(prepared.draft, context);
-      const currentValidationDigest = safeDigest(currentValidation as unknown as JsonValue);
+      const currentValidationDigest = safeTransportDigest(currentValidation);
       const validationUnchanged = suppliedChecksum !== null
         && currentValidationDigest.ok
         && suppliedChecksum.validationDigest === currentValidationDigest.value;
@@ -197,7 +202,7 @@ export function createPrepareSubmitContract<Input, Draft extends JsonObject, Con
           refusal: refusal(
             'PREPARE_SUBMIT_DIVERGENCE',
             currentValidation,
-            `${definition.subject} refused because ${reasons.join('; ')}.`,
+            `${subject} refused because ${reasons.join('; ')}.`,
           ),
         };
       }
@@ -238,6 +243,27 @@ function safeDigest(value: JsonValue):
   | { ok: false; error: Error } {
   try {
     return { ok: true, value: digest(value) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+}
+
+function digestTransport(value: unknown): string {
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) {
+    throw new TypeError('prepare/submit validation metadata must be JSON-serializable');
+  }
+  return digest(JSON.parse(serialized) as JsonValue);
+}
+
+function safeTransportDigest(value: unknown):
+  | { ok: true; value: string }
+  | { ok: false; error: Error } {
+  try {
+    return { ok: true, value: digestTransport(value) };
   } catch (error) {
     return {
       ok: false,
